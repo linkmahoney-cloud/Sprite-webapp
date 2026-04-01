@@ -4,6 +4,7 @@ const navItems = [
   { path: '/', label: 'Dashboard', icon: '◉' },
   { path: '/tasks', label: 'Tasks', icon: '☑' },
   { path: '/sprite', label: 'SPRITE', icon: '◎' },
+  { path: '/sprite/history', label: 'SPRITE History', icon: '📊' },
   { path: '/calendar', label: 'Calendar', icon: '▦' },
   { path: '/email', label: 'Email', icon: '✉' },
   { path: '/messages', label: 'Messages', icon: '💬' },

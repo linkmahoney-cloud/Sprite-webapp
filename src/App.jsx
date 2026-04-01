@@ -6,6 +6,7 @@ import Dashboard from './components/Dashboard/Dashboard'
 import TasksPage from './components/Tasks/TasksPage'
 import CalendarPage from './components/Calendar/CalendarPage'
 import SpritePage from './components/Sprite/SpritePage'
+import SpriteHistoryPage from './components/Sprite/SpriteHistoryPage'
 import FinancesPage from './components/Finances/FinancesPage'
 import EmailPage from './components/Email/EmailPage'
 import ContactsPage from './components/Contacts/ContactsPage'
@@ -31,6 +32,7 @@ export default function App() {
         <Route path="/tasks" element={<TasksPage />} />
         <Route path="/calendar" element={<CalendarPage />} />
         <Route path="/sprite" element={<SpritePage />} />
+        <Route path="/sprite/history" element={<SpriteHistoryPage />} />
         <Route path="/finances" element={<FinancesPage />} />
         <Route path="/email" element={<EmailPage />} />
         <Route path="/contacts" element={<ContactsPage />} />
