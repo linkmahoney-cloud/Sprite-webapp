@@ -7,13 +7,12 @@ function formatHour(h) {
   return `${h - 12} PM`
 }
 
-function getEventPosition(event) {
+function getEventTimes(event) {
   const start = new Date(event.start?.dateTime || event.start?.date)
   const end = new Date(event.end?.dateTime || event.end?.date)
   const startMin = start.getHours() * 60 + start.getMinutes()
   const endMin = end.getHours() * 60 + end.getMinutes()
-  const duration = Math.max(endMin - startMin, 15)
-  return { top: startMin, height: duration }
+  return { startMin, endMin: Math.max(endMin, startMin + 15) }
 }
 
 function getEventColor(event) {
@@ -25,11 +24,68 @@ function getEventColor(event) {
   return colorMap[event.colorId] || event.color || '#3b82f6'
 }
 
+function layoutEvents(events) {
+  const items = events
+    .filter(e => e.start?.dateTime)
+    .map(e => ({ event: e, ...getEventTimes(e) }))
+    .sort((a, b) => a.startMin - b.startMin || a.endMin - b.endMin)
+
+  if (items.length === 0) return []
+
+  const clusters = []
+  let currentCluster = [items[0]]
+  let clusterEnd = items[0].endMin
+
+  for (let i = 1; i < items.length; i++) {
+    if (items[i].startMin < clusterEnd) {
+      currentCluster.push(items[i])
+      clusterEnd = Math.max(clusterEnd, items[i].endMin)
+    } else {
+      clusters.push(currentCluster)
+      currentCluster = [items[i]]
+      clusterEnd = items[i].endMin
+    }
+  }
+  clusters.push(currentCluster)
+
+  const result = []
+  for (const cluster of clusters) {
+    const columns = []
+    const clusterItems = []
+
+    for (const item of cluster) {
+      let placed = false
+      for (let col = 0; col < columns.length; col++) {
+        const lastInCol = columns[col][columns[col].length - 1]
+        if (item.startMin >= lastInCol.endMin) {
+          columns[col].push(item)
+          clusterItems.push({ ...item, col })
+          placed = true
+          break
+        }
+      }
+      if (!placed) {
+        columns.push([item])
+        clusterItems.push({ ...item, col: columns.length - 1 })
+      }
+    }
+
+    const totalCols = columns.length
+    for (const ci of clusterItems) {
+      result.push({ ...ci, totalCols })
+    }
+  }
+
+  return result
+}
+
 export default function DayView({ events, date, onEventClick, onSlotClick }) {
   const dayEvents = events.filter(e => {
     const eDate = new Date(e.start?.dateTime || e.start?.date)
     return eDate.toDateString() === date.toDateString()
   })
+
+  const layouted = layoutEvents(dayEvents)
 
   const handleSlotClick = (hour) => {
     const d = new Date(date)
@@ -47,34 +103,41 @@ export default function DayView({ events, date, onEventClick, onSlotClick }) {
           </div>
         ))}
 
-        {dayEvents.map(event => {
-          if (!event.start?.dateTime) return null
-          const { top, height } = getEventPosition(event)
-          const color = getEventColor(event)
-          const sprite = event.extendedProperties?.private?.sprite_category
+        <div className="events-container">
+          {layouted.map(({ event, startMin, endMin, col, totalCols }) => {
+            const color = getEventColor(event)
+            const sprite = event.extendedProperties?.private?.sprite_category
+            const height = Math.max(endMin - startMin, 20)
+            const leftPct = (col / totalCols) * 100
+            const widthPct = (1 / totalCols) * 100
 
-          return (
-            <div
-              key={event.id}
-              className="cal-event"
-              style={{
-                top: `${top}px`,
-                height: `${Math.max(height, 20)}px`,
-                borderLeft: `3px solid ${color}`,
-                background: `${color}22`,
-              }}
-              onClick={(e) => { e.stopPropagation(); onEventClick?.(event) }}
-            >
-              <div className="cal-event-title">{event.summary || '(No title)'}</div>
-              <div className="cal-event-time">
-                {new Date(event.start.dateTime).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
-                {' – '}
-                {new Date(event.end.dateTime).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+            return (
+              <div
+                key={event.id}
+                className="cal-event"
+                style={{
+                  top: `${startMin}px`,
+                  height: `${height}px`,
+                  left: `${leftPct}%`,
+                  width: `calc(${widthPct}% - 4px)`,
+                  borderLeft: `3px solid ${color}`,
+                  background: `${color}22`,
+                }}
+                onClick={(e) => { e.stopPropagation(); onEventClick?.(event) }}
+              >
+                <div className="cal-event-title">{event.summary || '(No title)'}</div>
+                {height >= 30 && (
+                  <div className="cal-event-time">
+                    {new Date(event.start.dateTime).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                    {' – '}
+                    {new Date(event.end.dateTime).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                  </div>
+                )}
+                {sprite && <span className="cal-event-sprite">{sprite}</span>}
               </div>
-              {sprite && <span className="cal-event-sprite">{sprite}</span>}
-            </div>
-          )
-        })}
+            )
+          })}
+        </div>
       </div>
 
       <style>{`
@@ -103,18 +166,26 @@ export default function DayView({ events, date, onEventClick, onSlotClick }) {
           text-align: right;
         }
         .hour-cell { flex: 1; }
-        .cal-event {
+        .events-container {
           position: absolute;
+          top: 0;
           left: 78px;
           right: 8px;
+          bottom: 0;
+          pointer-events: none;
+        }
+        .cal-event {
+          position: absolute;
           border-radius: 6px;
           padding: 4px 8px;
           cursor: pointer;
           overflow: hidden;
           z-index: 1;
           transition: opacity 0.15s;
+          box-sizing: border-box;
+          pointer-events: auto;
         }
-        .cal-event:hover { opacity: 0.85; }
+        .cal-event:hover { opacity: 0.85; z-index: 2; }
         .cal-event-title {
           font-size: 12px;
           font-weight: 600;
