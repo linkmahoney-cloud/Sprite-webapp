@@ -15,28 +15,35 @@ const RANGES = [
   { key: '365', label: '1 Year' },
 ]
 
+const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
-function formatDateLabel(dateStr, range) {
+// Format like "Apr 1, 2026" for the X-axis
+function formatXAxisDate(dateStr, range) {
   const d = new Date(dateStr + 'T12:00:00')
-  if (parseInt(range) <= 14) {
-    return `${DAY_NAMES[d.getDay()]} ${d.getMonth() + 1}/${d.getDate()}`
+  const month = MONTH_NAMES[d.getMonth()]
+  const day = d.getDate()
+  const year = d.getFullYear()
+  if (parseInt(range) <= 30) {
+    return `${month} ${day}`
   }
-  if (parseInt(range) <= 90) {
-    return `${d.getMonth() + 1}/${d.getDate()}`
-  }
-  return `${d.getMonth() + 1}/${d.getDate()}`
+  return `${month} ${day}, ${year}`
+}
+
+// Full format for tooltip header
+function formatFullDate(dateStr) {
+  const d = new Date(dateStr + 'T12:00:00')
+  const dayName = DAY_NAMES[d.getDay()]
+  const month = MONTH_NAMES[d.getMonth()]
+  return `${dayName}, ${month} ${d.getDate()}, ${d.getFullYear()}`
 }
 
 function CustomTooltip({ active, payload, label }) {
   if (!active || !payload?.length) return null
-  const d = new Date(label + 'T12:00:00')
-  const dayName = DAY_NAMES[d.getDay()]
-  const dateLabel = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 
   return (
     <div className="history-tooltip">
-      <div className="tooltip-date">{dayName}, {dateLabel}</div>
+      <div className="tooltip-date">{formatFullDate(label)}</div>
       {payload.map(p => (
         <div key={p.dataKey} className="tooltip-row">
           <span className="tooltip-dot" style={{ background: p.color }} />
@@ -48,12 +55,27 @@ function CustomTooltip({ active, payload, label }) {
   )
 }
 
+// Custom legend matching the screenshot style — colored circles with labels
+function ChartLegend({ categories }) {
+  return (
+    <div className="chart-legend">
+      <span className="chart-legend-title">Legend</span>
+      {categories.map(cat => (
+        <div key={cat.key} className="chart-legend-item">
+          <span className="chart-legend-dot" style={{ background: cat.color }} />
+          <span>{cat.label}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 export default function SpriteHistoryPage() {
   const [history, setHistory] = useState([])
   const [loading, setLoading] = useState(true)
   const [range, setRange] = useState('30')
   const [selectedCats, setSelectedCats] = useState(SPRITE_CATEGORIES.map(c => c.key))
-  const [viewMode, setViewMode] = useState('combined') // combined | individual
+  const [viewMode, setViewMode] = useState('combined')
 
   const fetchHistory = useCallback(async () => {
     setLoading(true)
@@ -64,10 +86,7 @@ export default function SpriteHistoryPage() {
       const res = await fetch(`/api/sprite/history?days=${range}`, {
         headers: { Authorization: `Bearer ${session.access_token}` },
       })
-      if (res.ok) {
-        const data = await res.json()
-        setHistory(data)
-      }
+      if (res.ok) setHistory(await res.json())
     } catch (e) {
       console.error('History fetch error:', e)
     }
@@ -82,7 +101,9 @@ export default function SpriteHistoryPage() {
     )
   }
 
-  // Compute weekly averages for the "by day of week" analysis
+  const activeCats = SPRITE_CATEGORIES.filter(c => selectedCats.includes(c.key))
+
+  // Day-of-week averages
   const dayOfWeekAvgs = {}
   for (const cat of SPRITE_CATEGORIES) {
     dayOfWeekAvgs[cat.key] = Array(7).fill(null).map((_, dow) => {
@@ -100,21 +121,16 @@ export default function SpriteHistoryPage() {
     return row
   })
 
-  // Overall averages per category
+  // Overall averages
   const overallAvgs = SPRITE_CATEGORIES.map(cat => {
     if (history.length === 0) return { ...cat, avg: 0 }
     const avg = Math.round(history.reduce((s, h) => s + (h[cat.key] || 0), 0) / history.length)
     return { ...cat, avg }
   })
 
-  // Format x-axis data
-  const chartData = history.map(h => ({
-    ...h,
-    label: formatDateLabel(h.date, range),
-  }))
-
-  // Determine tick interval based on range
-  const tickInterval = parseInt(range) <= 14 ? 0 : parseInt(range) <= 30 ? 2 : parseInt(range) <= 90 ? 6 : 14
+  // Tick interval so labels don't overlap
+  const numDays = parseInt(range)
+  const tickInterval = numDays <= 7 ? 0 : numDays <= 14 ? 1 : numDays <= 30 ? 3 : numDays <= 90 ? 9 : numDays <= 180 ? 14 : 30
 
   return (
     <div className="sprite-history-page">
@@ -133,7 +149,7 @@ export default function SpriteHistoryPage() {
         </div>
       </div>
 
-      {/* Category toggles */}
+      {/* Category toggles + view mode */}
       <div className="cat-toggles">
         {SPRITE_CATEGORIES.map(cat => (
           <button
@@ -151,21 +167,11 @@ export default function SpriteHistoryPage() {
           </button>
         ))}
         <div style={{ flex: 1 }} />
-        <button
-          className={`range-btn ${viewMode === 'combined' ? 'active' : ''}`}
-          onClick={() => setViewMode('combined')}
-        >
-          Combined
-        </button>
-        <button
-          className={`range-btn ${viewMode === 'individual' ? 'active' : ''}`}
-          onClick={() => setViewMode('individual')}
-        >
-          Individual
-        </button>
+        <button className={`range-btn ${viewMode === 'combined' ? 'active' : ''}`} onClick={() => setViewMode('combined')}>Combined</button>
+        <button className={`range-btn ${viewMode === 'individual' ? 'active' : ''}`} onClick={() => setViewMode('individual')}>Individual</button>
       </div>
 
-      {/* Overall averages */}
+      {/* Average cards */}
       <div className="avg-cards">
         {overallAvgs.map(cat => (
           <div key={cat.key} className="avg-card" style={{ borderColor: `${cat.color}44` }}>
@@ -178,40 +184,56 @@ export default function SpriteHistoryPage() {
       {loading ? (
         <p style={{ color: 'var(--text-muted)', padding: 20 }}>Loading history...</p>
       ) : viewMode === 'combined' ? (
-        /* Combined chart — all selected categories on one graph */
         <div className="chart-section">
-          <h3>All Categories</h3>
+          <div className="chart-title-row">
+            <h3>SPRITE Scores Over Time</h3>
+            <ChartLegend categories={activeCats} />
+          </div>
           <div className="chart-wrapper">
-            <ResponsiveContainer width="100%" height={400}>
-              <LineChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+            <ResponsiveContainer width="100%" height={480}>
+              <LineChart data={history} margin={{ top: 10, right: 20, bottom: 60, left: 10 }}>
+                <CartesianGrid
+                  strokeDasharray="none"
+                  stroke="rgba(255,255,255,0.06)"
+                  vertical={false}
+                />
                 <XAxis
                   dataKey="date"
-                  tick={{ fill: 'var(--text-muted)', fontSize: 11 }}
-                  tickFormatter={(v) => formatDateLabel(v, range)}
+                  tick={{ fill: '#8a8a9a', fontSize: 11 }}
+                  tickFormatter={(v) => formatXAxisDate(v, range)}
                   interval={tickInterval}
+                  angle={-45}
+                  textAnchor="end"
+                  height={60}
+                  axisLine={{ stroke: 'rgba(255,255,255,0.12)' }}
+                  tickLine={{ stroke: 'rgba(255,255,255,0.08)' }}
                 />
                 <YAxis
                   domain={[0, 200]}
-                  ticks={[0, 25, 50, 75, 100, 125, 150, 175, 200]}
-                  tick={{ fill: 'var(--text-muted)', fontSize: 11 }}
+                  ticks={[0, 20, 40, 60, 80, 100, 120, 140, 160, 180, 200]}
+                  tick={{ fill: '#8a8a9a', fontSize: 11 }}
                   tickFormatter={(v) => `${v}%`}
+                  axisLine={{ stroke: 'rgba(255,255,255,0.12)' }}
+                  tickLine={false}
+                  width={50}
                 />
-                <ReferenceLine y={100} stroke="var(--accent-gold)" strokeDasharray="5 5" strokeOpacity={0.5} label={{ value: '100%', fill: 'var(--accent-gold)', fontSize: 11, position: 'right' }} />
+                <ReferenceLine
+                  y={100}
+                  stroke="var(--accent-gold)"
+                  strokeDasharray="6 4"
+                  strokeOpacity={0.4}
+                />
                 <Tooltip content={<CustomTooltip />} />
-                <Legend
-                  formatter={(value) => SPRITE_CATEGORIES.find(c => c.key === value)?.label || value}
-                  wrapperStyle={{ fontSize: 12 }}
-                />
-                {SPRITE_CATEGORIES.filter(c => selectedCats.includes(c.key)).map(cat => (
+                {activeCats.map(cat => (
                   <Line
                     key={cat.key}
                     type="monotone"
                     dataKey={cat.key}
                     stroke={cat.color}
-                    strokeWidth={2}
-                    dot={parseInt(range) <= 14}
-                    activeDot={{ r: 5, fill: cat.color }}
+                    strokeWidth={2.5}
+                    dot={numDays <= 14 ? { r: 3, fill: cat.color, strokeWidth: 0 } : false}
+                    activeDot={{ r: 6, fill: cat.color, stroke: '#0d0a14', strokeWidth: 2 }}
+                    connectNulls
                   />
                 ))}
               </LineChart>
@@ -219,37 +241,43 @@ export default function SpriteHistoryPage() {
           </div>
         </div>
       ) : (
-        /* Individual charts — one per category */
         <div className="individual-charts">
-          {SPRITE_CATEGORIES.filter(c => selectedCats.includes(c.key)).map(cat => (
+          {activeCats.map(cat => (
             <div key={cat.key} className="chart-section individual">
               <h3 style={{ color: cat.color }}>{cat.label}</h3>
               <div className="chart-wrapper">
-                <ResponsiveContainer width="100%" height={220}>
-                  <LineChart data={chartData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                <ResponsiveContainer width="100%" height={260}>
+                  <LineChart data={history} margin={{ top: 10, right: 15, bottom: 50, left: 5 }}>
+                    <CartesianGrid strokeDasharray="none" stroke="rgba(255,255,255,0.06)" vertical={false} />
                     <XAxis
                       dataKey="date"
-                      tick={{ fill: 'var(--text-muted)', fontSize: 10 }}
-                      tickFormatter={(v) => formatDateLabel(v, range)}
+                      tick={{ fill: '#8a8a9a', fontSize: 10 }}
+                      tickFormatter={(v) => formatXAxisDate(v, range)}
                       interval={tickInterval}
+                      angle={-45}
+                      textAnchor="end"
+                      height={50}
+                      axisLine={{ stroke: 'rgba(255,255,255,0.12)' }}
+                      tickLine={false}
                     />
                     <YAxis
                       domain={[0, 200]}
                       ticks={[0, 50, 100, 150, 200]}
-                      tick={{ fill: 'var(--text-muted)', fontSize: 10 }}
+                      tick={{ fill: '#8a8a9a', fontSize: 10 }}
                       tickFormatter={(v) => `${v}%`}
+                      axisLine={false}
+                      tickLine={false}
+                      width={40}
                     />
-                    <ReferenceLine y={100} stroke={cat.color} strokeDasharray="5 5" strokeOpacity={0.3} />
+                    <ReferenceLine y={100} stroke={cat.color} strokeDasharray="6 4" strokeOpacity={0.25} />
                     <Tooltip content={<CustomTooltip />} />
                     <Line
                       type="monotone"
                       dataKey={cat.key}
                       stroke={cat.color}
                       strokeWidth={2.5}
-                      dot={parseInt(range) <= 14}
-                      activeDot={{ r: 5, fill: cat.color }}
-                      fill={`${cat.color}20`}
+                      dot={numDays <= 14 ? { r: 3, fill: cat.color, strokeWidth: 0 } : false}
+                      activeDot={{ r: 6, fill: cat.color, stroke: '#0d0a14', strokeWidth: 2 }}
                     />
                   </LineChart>
                 </ResponsiveContainer>
@@ -261,38 +289,44 @@ export default function SpriteHistoryPage() {
 
       {/* Day-of-week patterns */}
       <div className="chart-section">
-        <h3>Average by Day of Week</h3>
-        <p style={{ color: 'var(--text-muted)', fontSize: 12, marginBottom: 12 }}>
-          See which days you tend to lack in each category.
-        </p>
+        <div className="chart-title-row">
+          <div>
+            <h3>Average by Day of Week</h3>
+            <p style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 4 }}>
+              Spot which days you tend to fall behind in each category.
+            </p>
+          </div>
+          <ChartLegend categories={activeCats} />
+        </div>
         <div className="chart-wrapper">
-          <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={dowChartData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+          <ResponsiveContainer width="100%" height={340}>
+            <LineChart data={dowChartData} margin={{ top: 10, right: 20, bottom: 10, left: 10 }}>
+              <CartesianGrid strokeDasharray="none" stroke="rgba(255,255,255,0.06)" vertical={false} />
               <XAxis
                 dataKey="day"
-                tick={{ fill: 'var(--text-muted)', fontSize: 12 }}
+                tick={{ fill: '#8a8a9a', fontSize: 12, fontWeight: 500 }}
+                axisLine={{ stroke: 'rgba(255,255,255,0.12)' }}
+                tickLine={false}
               />
               <YAxis
                 domain={[0, 'auto']}
-                tick={{ fill: 'var(--text-muted)', fontSize: 11 }}
+                tick={{ fill: '#8a8a9a', fontSize: 11 }}
                 tickFormatter={(v) => `${v}%`}
+                axisLine={false}
+                tickLine={false}
+                width={50}
               />
-              <ReferenceLine y={100} stroke="var(--accent-gold)" strokeDasharray="5 5" strokeOpacity={0.3} />
+              <ReferenceLine y={100} stroke="var(--accent-gold)" strokeDasharray="6 4" strokeOpacity={0.3} />
               <Tooltip content={<CustomTooltip />} />
-              <Legend
-                formatter={(value) => SPRITE_CATEGORIES.find(c => c.key === value)?.label || value}
-                wrapperStyle={{ fontSize: 12 }}
-              />
-              {SPRITE_CATEGORIES.filter(c => selectedCats.includes(c.key)).map(cat => (
+              {activeCats.map(cat => (
                 <Line
                   key={cat.key}
                   type="monotone"
                   dataKey={cat.key}
                   stroke={cat.color}
                   strokeWidth={2.5}
-                  dot={{ r: 4, fill: cat.color }}
-                  activeDot={{ r: 6 }}
+                  dot={{ r: 5, fill: cat.color, stroke: '#0d0a14', strokeWidth: 2 }}
+                  activeDot={{ r: 7, fill: cat.color, stroke: '#0d0a14', strokeWidth: 2 }}
                 />
               ))}
             </LineChart>
@@ -331,6 +365,8 @@ export default function SpriteHistoryPage() {
           font-weight: 500;
         }
         .cat-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+        /* Average cards */
         .avg-cards {
           display: grid; grid-template-columns: repeat(6, 1fr);
           gap: 10px; margin-bottom: 20px;
@@ -342,36 +378,66 @@ export default function SpriteHistoryPage() {
         }
         .avg-num { font-size: 22px; font-weight: 700; }
         .avg-label { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+
+        /* Chart sections */
         .chart-section {
           background: var(--bg-card); border: 1px solid var(--border);
-          border-radius: 12px; padding: 20px; margin-bottom: 16px;
+          border-radius: 12px; padding: 24px; margin-bottom: 16px;
         }
-        .chart-section h3 { margin: 0 0 12px; font-size: 15px; }
-        .chart-wrapper { margin: 0 -10px; }
+        .chart-section h3 { margin: 0; font-size: 15px; }
+        .chart-title-row {
+          display: flex; justify-content: space-between; align-items: flex-start;
+          margin-bottom: 16px;
+        }
+        .chart-wrapper { }
         .individual-charts {
           display: grid; grid-template-columns: 1fr 1fr;
           gap: 16px; margin-bottom: 16px;
         }
-        .chart-section.individual { margin-bottom: 0; }
+        .chart-section.individual { margin-bottom: 0; padding: 18px; }
+
+        /* Legend — styled like the screenshot */
+        .chart-legend {
+          background: rgba(255,255,255,0.03); border: 1px solid var(--border);
+          border-radius: 8px; padding: 10px 14px;
+          display: flex; flex-direction: column; gap: 5px;
+          min-width: 130px;
+        }
+        .chart-legend-title {
+          font-size: 12px; font-weight: 600; color: var(--text-primary);
+          margin-bottom: 2px;
+        }
+        .chart-legend-item {
+          display: flex; align-items: center; gap: 8px;
+          font-size: 12px; color: var(--text-secondary);
+        }
+        .chart-legend-dot {
+          width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
+        }
 
         /* Tooltip */
         .history-tooltip {
-          background: var(--bg-card); border: 1px solid var(--border);
-          border-radius: 8px; padding: 10px 14px;
-          box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+          background: #1a1625; border: 1px solid var(--border);
+          border-radius: 8px; padding: 12px 16px;
+          box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+          min-width: 180px;
         }
         .tooltip-date {
-          font-size: 12px; font-weight: 600; color: var(--text-primary);
-          margin-bottom: 6px; border-bottom: 1px solid var(--border);
-          padding-bottom: 4px;
+          font-size: 13px; font-weight: 600; color: var(--text-primary);
+          margin-bottom: 8px; border-bottom: 1px solid var(--border);
+          padding-bottom: 6px;
         }
         .tooltip-row {
-          display: flex; align-items: center; gap: 6px;
-          font-size: 12px; padding: 2px 0;
+          display: flex; align-items: center; gap: 8px;
+          font-size: 12px; padding: 3px 0;
         }
-        .tooltip-dot { width: 8px; height: 8px; border-radius: 50%; }
+        .tooltip-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
         .tooltip-cat { color: var(--text-muted); flex: 1; }
-        .tooltip-val { font-weight: 600; color: var(--text-primary); }
+        .tooltip-val { font-weight: 700; color: var(--text-primary); font-size: 13px; }
+
+        /* Recharts overrides for dark theme */
+        .recharts-cartesian-grid-horizontal line { stroke: rgba(255,255,255,0.06); }
+        .recharts-text { fill: #8a8a9a; }
 
         @media (max-width: 900px) {
           .avg-cards { grid-template-columns: repeat(3, 1fr); }
