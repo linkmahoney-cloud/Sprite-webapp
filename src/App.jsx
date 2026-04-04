@@ -13,12 +13,21 @@ import ContactsPage from './components/Contacts/ContactsPage'
 import MessagesPage from './components/Messages/MessagesPage'
 
 export default function App() {
-  const { user, loading } = useAuth()
+  const { user, loading, error } = useAuth()
 
   if (loading) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: 'var(--bg-primary)', color: 'var(--text-muted)' }}>
         Loading...
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: 'var(--bg-primary)', color: '#ff6b6b', flexDirection: 'column', gap: 12 }}>
+        <h2>Configuration Error</h2>
+        <p style={{ color: 'var(--text-muted)' }}>{error}</p>
       </div>
     )
   }
