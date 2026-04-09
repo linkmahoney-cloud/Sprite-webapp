@@ -1,27 +1,29 @@
+import { lazy, Suspense } from 'react'
 import { Routes, Route } from 'react-router-dom'
 import { useAuth } from './contexts/AuthContext'
-import Layout from './components/Layout/Layout'
 import LoginPage from './components/Auth/LoginPage'
-import Dashboard from './components/Dashboard/Dashboard'
-import TasksPage from './components/Tasks/TasksPage'
-import CalendarPage from './components/Calendar/CalendarPage'
-import SpritePage from './components/Sprite/SpritePage'
-import SpriteHistoryPage from './components/Sprite/SpriteHistoryPage'
-import FinancesPage from './components/Finances/FinancesPage'
-import EmailPage from './components/Email/EmailPage'
-import ContactsPage from './components/Contacts/ContactsPage'
-import MessagesPage from './components/Messages/MessagesPage'
+
+const Layout = lazy(() => import('./components/Layout/Layout'))
+const Dashboard = lazy(() => import('./components/Dashboard/Dashboard'))
+const TasksPage = lazy(() => import('./components/Tasks/TasksPage'))
+const CalendarPage = lazy(() => import('./components/Calendar/CalendarPage'))
+const SpritePage = lazy(() => import('./components/Sprite/SpritePage'))
+const SpriteHistoryPage = lazy(() => import('./components/Sprite/SpriteHistoryPage'))
+const FinancesPage = lazy(() => import('./components/Finances/FinancesPage'))
+const EmailPage = lazy(() => import('./components/Email/EmailPage'))
+const ContactsPage = lazy(() => import('./components/Contacts/ContactsPage'))
+const MessagesPage = lazy(() => import('./components/Messages/MessagesPage'))
+
+const LoadingScreen = () => (
+  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: 'var(--bg-primary)', color: 'var(--text-muted)' }}>
+    Loading...
+  </div>
+)
 
 export default function App() {
   const { user, loading, error } = useAuth()
 
-  if (loading) {
-    return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: 'var(--bg-primary)', color: 'var(--text-muted)' }}>
-        Loading...
-      </div>
-    )
-  }
+  if (loading) return <LoadingScreen />
 
   if (error) {
     return (
@@ -35,18 +37,20 @@ export default function App() {
   if (!user) return <LoginPage />
 
   return (
-    <Layout>
-      <Routes>
-        <Route path="/" element={<Dashboard />} />
-        <Route path="/tasks" element={<TasksPage />} />
-        <Route path="/calendar" element={<CalendarPage />} />
-        <Route path="/sprite" element={<SpritePage />} />
-        <Route path="/sprite/history" element={<SpriteHistoryPage />} />
-        <Route path="/finances" element={<FinancesPage />} />
-        <Route path="/email" element={<EmailPage />} />
-        <Route path="/contacts" element={<ContactsPage />} />
-        <Route path="/messages" element={<MessagesPage />} />
-      </Routes>
-    </Layout>
+    <Suspense fallback={<LoadingScreen />}>
+      <Layout>
+        <Routes>
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/tasks" element={<TasksPage />} />
+          <Route path="/calendar" element={<CalendarPage />} />
+          <Route path="/sprite" element={<SpritePage />} />
+          <Route path="/sprite/history" element={<SpriteHistoryPage />} />
+          <Route path="/finances" element={<FinancesPage />} />
+          <Route path="/email" element={<EmailPage />} />
+          <Route path="/contacts" element={<ContactsPage />} />
+          <Route path="/messages" element={<MessagesPage />} />
+        </Routes>
+      </Layout>
+    </Suspense>
   )
 }
