@@ -193,7 +193,7 @@ export default function Dashboard() {
               <span className="review-label">Min Logged</span>
             </div>
             <div className="review-stat">
-              <span className="review-num">{Math.round(scores.reduce((s, sc) => s + sc.score, 0) / 6)}%</span>
+              <span className="review-num">{Math.round(Object.values(scores).reduce((s, sc) => s + sc, 0) / 6)}%</span>
               <span className="review-label">Avg Score</span>
             </div>
           </div>
