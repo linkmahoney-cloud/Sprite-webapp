@@ -18,6 +18,7 @@ export default function Dashboard() {
   const [emailStats, setEmailStats] = useState(null)
   const [contactStats, setContactStats] = useState(null)
   const [financeStats, setFinanceStats] = useState(null)
+  const [calendarEvents, setCalendarEvents] = useState(null)
 
   const getToken = useCallback(async () => {
     const { data: { session } } = await supabase.auth.getSession()
@@ -54,6 +55,20 @@ export default function Dashboard() {
           birthdaysSoon: bdays.length,
           overdueCount: overdue.length,
         })
+      } catch (e) {}
+
+      // Calendar events
+      try {
+        const now = new Date()
+        const timeMin = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString()
+        const timeMax = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).toISOString()
+        const res = await fetch(`/api/calendar/events?timeMin=${timeMin}&timeMax=${timeMax}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        if (res.ok) {
+          const events = await res.json()
+          setCalendarEvents(events)
+        }
       } catch (e) {}
 
       // Finance stats
@@ -265,9 +280,28 @@ export default function Dashboard() {
           )}
         </DashboardCard>
 
-        {/* Schedule placeholder */}
+        {/* Schedule */}
         <DashboardCard title="Schedule">
-          <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>Connect Google Calendar to see today's events.</p>
+          {calendarEvents ? (
+            calendarEvents.length === 0
+              ? <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>No events today.</p>
+              : <ul className="dash-list">
+                  {calendarEvents.slice(0, 5).map((ev, i) => {
+                    const start = ev.start?.dateTime ? new Date(ev.start.dateTime).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : 'All day'
+                    return (
+                      <li key={ev.id || i} style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span>{ev.summary || 'Untitled'}</span>
+                        <span style={{ color: 'var(--text-muted)', fontSize: 11, whiteSpace: 'nowrap', marginLeft: 8 }}>{start}</span>
+                      </li>
+                    )
+                  })}
+                  {calendarEvents.length > 5 && (
+                    <li style={{ color: 'var(--text-muted)' }}>+{calendarEvents.length - 5} more</li>
+                  )}
+                </ul>
+          ) : (
+            <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>Connect Google Calendar to see today's events.</p>
+          )}
         </DashboardCard>
       </div>
 
