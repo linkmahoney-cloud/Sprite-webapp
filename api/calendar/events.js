@@ -1,6 +1,6 @@
 import { google } from 'googleapis'
-import { getAuthenticatedClient } from '../lib/googleAuth.js'
-import { getUserFromRequest } from '../lib/supabaseAdmin.js'
+import { getAuthenticatedClient } from '../_lib/googleAuth.js'
+import { getUserFromRequest } from '../_lib/supabaseAdmin.js'
 
 export default async function handler(req, res) {
   const user = await getUserFromRequest(req)

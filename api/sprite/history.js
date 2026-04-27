@@ -1,4 +1,4 @@
-import { getUserFromRequest, supabaseAdmin } from '../lib/supabaseAdmin.js'
+import { getUserFromRequest, supabaseAdmin } from '../_lib/supabaseAdmin.js'
 
 // Same daily goals as frontend spriteCalc.js
 const DEFAULT_GOALS = {

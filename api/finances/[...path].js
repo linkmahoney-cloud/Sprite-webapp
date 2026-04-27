@@ -1,4 +1,4 @@
-import { getUserFromRequest, supabaseAdmin } from '../lib/supabaseAdmin.js'
+import { getUserFromRequest, supabaseAdmin } from '../_lib/supabaseAdmin.js'
 
 // ── Default categories (used by /categories) ──
 const DEFAULT_CATEGORIES = [

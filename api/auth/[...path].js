@@ -1,5 +1,5 @@
-import { getOAuth2Client } from '../lib/googleAuth.js'
-import { getUserFromRequest, supabaseAdmin } from '../lib/supabaseAdmin.js'
+import { getOAuth2Client } from '../_lib/googleAuth.js'
+import { getUserFromRequest, supabaseAdmin } from '../_lib/supabaseAdmin.js'
 
 // --- Route: /api/auth/status ---
 async function handleStatus(req, res) {

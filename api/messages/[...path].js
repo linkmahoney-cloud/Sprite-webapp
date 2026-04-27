@@ -1,4 +1,4 @@
-import { getUserFromRequest, supabaseAdmin } from '../lib/supabaseAdmin.js'
+import { getUserFromRequest, supabaseAdmin } from '../_lib/supabaseAdmin.js'
 
 // --- Helper: get Meta token for Instagram ---
 async function getMetaTokenInstagram(userId) {
